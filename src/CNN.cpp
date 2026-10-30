@@ -3,6 +3,7 @@
 #include "MLP.h"
 #include "utils.hpp"
 #include "CNN.h"
+#include <stdexcept>
 #define LENET 1
 #define VGG 2
 #define TEST 3
@@ -903,7 +904,19 @@ void check_relu(vector<vector<vector<vector<F>>>> &input){
 
 struct convolutional_network feed_forward(vector<vector<vector<vector<F>>>> &X, struct convolutional_network net, int channels){
 	vector<vector<vector<vector<F>>>> input;
-	if(model == VGG){
+	if(!X.empty()){
+		if(X.size() != size_t(batch)) throw std::runtime_error("Input batch size mismatch");
+		for(const auto &image : X){
+			if(image.size() != size_t(channels)) throw std::runtime_error("Input channels mismatch");
+			for(const auto &channel : image){
+				if(channel.size() != 32) throw std::runtime_error("Expected 32x32 MNIST input");
+				for(const auto &row : channel)
+					if(row.size() != 32) throw std::runtime_error("Expected 32x32 MNIST input");
+			}
+		}
+		input = X;
+	}
+	else if(model == VGG){
 		input = init_input(64,channels);
 	}
 	else if(model == AlexNet || model == mAlexNet){
@@ -1536,7 +1549,8 @@ struct avg_layer_backprop avg_pool_der(vector<vector<vector<vector<F>>>> &derr,i
 
 
 
-struct convolutional_network back_propagation( struct convolutional_network net){
+struct convolutional_network back_propagation(struct convolutional_network net,
+    const vector<vector<F>> &output_gradient){
 	struct convolution_layer_backprop conv_der;
 	struct dense_layer_backprop dense_der;
 	struct relu_layer_backprop relu_der;
@@ -1545,8 +1559,13 @@ struct convolutional_network back_propagation( struct convolutional_network net)
 	//printf("Calculating Backpropagation Circuit\n");
 	vector<vector<vector<vector<F>>>> der(batch),dx(batch);
 	vector<vector<F>> out_der(batch),dense_dx(batch);
-	for(int i = 0; i < batch; i++){
-		out_der[i] = initialize_filter(16);
+	if(!output_gradient.empty()){
+		if(output_gradient.size() != size_t(batch)) throw std::runtime_error("Output gradient batch mismatch");
+		for(const auto &row : output_gradient)
+			if(row.size() != 16) throw std::runtime_error("Output gradient width mismatch");
+		out_der = output_gradient;
+	}else{
+		for(int i = 0; i < batch; i++) out_der[i] = initialize_filter(16);
 	}
 
 	for(int i = net.Weights.size()-1; i >= 0; i--){

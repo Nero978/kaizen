@@ -14,4 +14,4 @@ RUN unzip -q 3rd.zip \
 
 WORKDIR /opt/kaizen/build/src
 ENTRYPOINT ["./main"]
-CMD ["LENET", "1", "1", "-1", "1"]
+CMD ["LENET", "1", "1", "-1", "1", "/data/mnist", "0", "/results/sgd-step.json"]

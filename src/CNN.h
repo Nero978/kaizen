@@ -1,3 +1,4 @@
+#pragma once
 #include "config_pc.hpp"
 
 
@@ -147,7 +148,8 @@ struct convolutional_network{
 };
 
 
-struct convolutional_network back_propagation( struct convolutional_network net);
+struct convolutional_network back_propagation(struct convolutional_network net,
+    const vector<vector<F>> &output_gradient = {});
 struct convolution_layer_backprop conv_backprop(vector<vector<vector<vector<F>>>> &derr,vector<vector<vector<vector<F>>>> &dx, struct convolution_layer conv, vector<vector<vector<vector<F>>>> rotated_Filter);
 struct convolution_layer conv(vector<vector<vector<vector<F>>>> input, int fchout,int fchin, int fw);
 struct relu_layer _relu_layer(vector<F> input);

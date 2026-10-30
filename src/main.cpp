@@ -23,6 +23,8 @@
 #include "poly_commit.h"
 #include "lookups.h"
 #include<unistd.h>
+#include "mnist.hpp"
+#include <stdexcept>
 
 extern int partitions;
 
@@ -1867,12 +1869,17 @@ vector<vector<F>> prepare_input(vector<vector<F>> input){
 
 // Simulate check dataset SNARK just for experimental evaluation. 
 // To be fixed in the future
-void check_dataset(int batch, int input_dim){
-	vector<vector<F>> X(batch);
-	for(int i = 0; i < batch; i++){
-		X[i].resize(input_dim*input_dim);
-		for(int j = 0; j < X[i].size(); j++){
-			X[i][j] = random();//.setByCSPRNG();
+void check_dataset(int batch, int input_dim, const MnistBatch *mnist = nullptr){
+	vector<vector<F>> X;
+	if(mnist){
+		X = mnist->flattened;
+		if(X.size() != size_t(batch)) throw std::runtime_error("MNIST hash batch mismatch");
+		printf("Hashing actual MNIST padded pixels and labels; no full-dataset membership proof.\n");
+	}else{
+		X.resize(batch);
+		for(int i = 0; i < batch; i++){
+			X[i].resize(input_dim*input_dim);
+			for(int j = 0; j < X[i].size(); j++) X[i][j] = random();
 		}
 	}
 	vector<vector<vector<F>>> data;
@@ -1880,8 +1887,10 @@ void check_dataset(int batch, int input_dim){
 		for(int j = 0; j  < X[i].size(); j++){
 			mimc_hash(X[i][j],current_randomness);
 		}
-		for(int j = 0; j  < 16; j++){
-			mimc_hash(current_randomness,current_randomness);
+		if(mnist){
+			mimc_hash(F(mnist->labels[i]),current_randomness);
+		}else{
+			for(int j = 0; j < 16; j++) mimc_hash(current_randomness,current_randomness);
 		}
 	}
 	vector<F> input = x_transcript;
@@ -2430,7 +2439,13 @@ void reduce_polynomials(vector<F> poly1, vector<F> poly2){
 }
 
 int main(int argc, char *argv[]){
-	
+	try{
+	if(argc < 6 || argc > 9){
+		fprintf(stderr,"Usage: main MODEL BATCH CHANNELS HASH_LEVELS PC [MNIST_DIR [OFFSET [SGD_JSON]]]\n");
+		return 2;
+	}
+	srand(1);
+	srandom(1);
 	elliptic_curves_init();
 	init_hash();
     init_SHA();
@@ -2483,6 +2498,22 @@ int main(int argc, char *argv[]){
    	int channels = atoi(argv[3]);
 	levels = atoi(argv[4]);
 	PC_scheme = atoi(argv[5]);
+	const bool real_mnist = argc >= 7;
+	MnistBatch mnist;
+	if(Batch <= 0 || (Batch & (Batch - 1)) != 0 || channels <= 0 ||
+	   (PC_scheme != 1 && PC_scheme != 2)) throw std::runtime_error("Invalid benchmark arguments");
+	if(real_mnist){
+		if(model != 1 || channels != 1) throw std::runtime_error("MNIST mode requires LENET and one channel");
+		int offset = 0;
+		if(argc >= 8){
+			size_t consumed;
+			offset = std::stoi(argv[7], &consumed);
+			if(consumed != strlen(argv[7])) throw std::runtime_error("Invalid MNIST offset");
+		}
+		mnist = load_mnist(argv[6], Batch, offset);
+		X = mnist.images;
+		printf("Experiment: real MNIST single batch; random initial weights; seed=1; learning_rate=0.01 (Q15)\n");
+	}
    	
 	
 	//test_aggregation(levels,channels);
@@ -2496,7 +2527,13 @@ int main(int argc, char *argv[]){
 	   	clock_t start,end;
 	   	
 		net = feed_forward(X, net,channels);
-	   	net = back_propagation(net);
+		if(real_mnist){
+			const auto gradient = mnist_loss_gradient(net.fully_connected.back().Z_new, mnist.labels);
+			net = back_propagation(net, gradient);
+			if(argc >= 9) save_mnist_step(net, mnist, argv[8]);
+		}else{
+			net = back_propagation(net);
+		}
 	   	
 		
 
@@ -2531,7 +2568,7 @@ int main(int argc, char *argv[]){
 		float PoGDsize = proof_size(Transcript);
 	   	vector<F> POGD_hashses = x_transcript;
 		x_transcript.clear();
-		check_dataset(channels*Batch,input_dim);
+		check_dataset(channels*Batch,input_dim,real_mnist ? &mnist : nullptr);
 	   	POGD_hashses.insert(POGD_hashses.end(), x_transcript.begin(),x_transcript.end());
 		x_transcript.clear();
 		float data_prove_time = proving_time;
@@ -2792,4 +2829,8 @@ int main(int argc, char *argv[]){
 
 
 	return 0;
+	}catch(const std::exception &error){
+		fprintf(stderr,"Error: %s\n", error.what());
+		return 2;
+	}
 }
