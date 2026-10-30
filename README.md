@@ -1,10 +1,4 @@
 # Kaizen
-For a real MNIST LeNet single-batch run in Docker, run `sh docker-smoke.sh`.
-This downloads and verifies MNIST, uses true labels to compute the output gradient,
-and saves logs, an SGD checkpoint, and independent validation results.
-See [DOCKER.md](DOCKER.md) for the measured result and proof-coverage limits.
-The original architecture test scripts below use synthetic data.
-
 To build zkPoT, first decompress 3rd.zip. Then make ./build.sh executable by using:
 > chmod +x build.sh
 

@@ -78,6 +78,11 @@ The successful run started at 18:35:21 and finished at 18:36:12 Singapore time.
 | Wall-clock time | 50.76 seconds |
 | User CPU time | 50.19 seconds |
 | Peak process RSS (GNU time) | 1,843,648 KiB, approximately 1.76 GiB |
+| PoGD gradient-computation proofs (reported CPU time) | 3.648842 seconds |
+| Input checking (reported CPU time) | 0.036699 seconds |
+| Commitment generation (reported CPU time) | 17.875784 seconds |
+| Aggregation (reported CPU time) | 18.868820 seconds |
+| Recursive proofs (reported CPU time, `Recursion P`) | 1.141459 seconds |
 | Program-reported verification time | 0.017480 seconds |
 | Program-reported proof-size estimate | 251.90625 KiB |
 | Cross entropy before the update | 2.792521596 |
